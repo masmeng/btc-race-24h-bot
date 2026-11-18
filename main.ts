@@ -9,7 +9,10 @@
 //   Session B: 03:00-07:59 UTC — dev +0.80% gross
 //
 // Rules (long only, at most 1 position, 100% of cash):
-//   - At the first bar closing inside a session, buy 100% of cash.
+//   - Inside a session, enter only on a bar that closed above the previous
+//     bar's close (momentum confirmation), waiting up to 10 bars for such a
+//     close; if none appears, skip that session. This avoids buying the
+//     session's first bar when it gapped down.
 //   - At the first bar closing outside the session, sell the whole position.
 //   - Max 1 round trip per session: a session whose entry was already sent is
 //     never re-entered. A full round trip costs ~26 bps (4 fee + 2 slippage +
@@ -33,7 +36,14 @@ function sessionOf(t: number): 'A' | 'B' | null {
   return null;
 }
 
-/** Session keys already entered this run (max 1 round trip per session). */
+/** Previous bar's close per symbol, to confirm momentum before entering. */
+const prevClose = new Map<string, bigint>();
+/** Bars waited into a session while looking for a confirming up bar, by session key. */
+const waitCount = new Map<string, number>();
+/** How many bars into a session to wait for an up close before skipping it. */
+const CONFIRM_BARS = 10;
+
+/** Session keys already entered or skipped this run (max 1 round trip per session). */
 const entered = new Set<string>();
 
 await runBars({
@@ -44,6 +54,11 @@ await runBars({
     for (const { symbol } of state.hello.symbols) {
       const bar = state.latest.get(symbol);
       if (bar === undefined) continue;
+      // Remember this bar's close first, so the next bar can confirm
+      // momentum against it; read the previous close before overwriting.
+      const pc = prevClose.get(symbol);
+      const close = BigInt(bar.c);
+      prevClose.set(symbol, close);
       const s = sessionOf(bar.t);
       const held = state.positions.get(symbol);
       if (held !== undefined) {
@@ -56,7 +71,17 @@ await runBars({
       if (s === null) continue;
       const key = `${Math.floor(bar.t / 86_400_000)}-${s}`;
       if (entered.has(key)) continue;
-      // First bar of the session: enter with 100% of cash.
+      // Momentum confirmation: only enter on a bar that closed above the
+      // previous bar's close, so we don't buy the session's first bar when
+      // it gapped down. Wait up to CONFIRM_BARS bars for such a close; if
+      // none appears, skip the session entirely.
+      if (pc === undefined || close <= pc) {
+        const waited = (waitCount.get(key) ?? 0) + 1;
+        waitCount.set(key, waited);
+        if (waited >= CONFIRM_BARS) entered.add(key);
+        continue;
+      }
+      // Confirmed up bar: enter with 100% of cash.
       let slice = state.cash;
       const byWeight = (BigInt(caps.max_weight_bps) * state.equity) / BPS;
       if (slice > byWeight) slice = byWeight;
