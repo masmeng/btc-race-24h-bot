@@ -1,5 +1,9 @@
 # btc-race-24h-bot
 
+[![make.fun · btc-race-24h-20261118-1444](https://make.fun/badge/btc-race-24h-20261118-1444.svg)](https://make.fun/bounty/btc-race-24h-20261118-1444?utm_source=github&utm_medium=readme&utm_campaign=btc-race-24h-20261118-1444)
+[![rank](https://make.fun/badge/btc-race-24h-20261118-1444/masmeng/btc-race-24h-bot/rank.svg)](https://make.fun/bounty/btc-race-24h-20261118-1444/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=btc-race-24h-20261118-1444)
+[![reward](https://make.fun/badge/btc-race-24h-20261118-1444/masmeng/btc-race-24h-bot/reward.svg)](https://make.fun/bounty/btc-race-24h-20261118-1444?utm_source=github&utm_medium=readme&utm_campaign=btc-race-24h-20261118-1444)
+
 A trading bot for the make.fun competition
 [btc-race-24h-20261118-1444](https://make.fun) — "Race a BTC trading bot live
 for 24 hours". It trades Coinbase Wrapped BTC (cbBTC) against USDC on 1-minute
@@ -26,7 +30,9 @@ sessions and falls or chops the rest of the day:
 
 The bot only holds during those sessions and stays flat otherwise:
 
-- **Entry:** at the first bar closing inside a session, buy 100% of cash.
+- **Entry:** inside a session, buy 100% of cash on the first bar that closes
+  above the previous bar's close (momentum confirmation); if no such bar
+  appears within the first 10 bars of a session, skip that session.
 - **Exit:** at the first bar closing outside the session, sell the whole
   position.
 - **At most 1 round trip per session**, so the ~26 bps round-trip cost is
@@ -44,9 +50,9 @@ $ node cli/makefun.mjs grade-local --kit . --bot <this repo> --driver process --
 
 Result on the dev window:
 
-- **Net PnL: +$19.32** (return +1.93%) — passes the dev gate (net PnL > $0)
+- **Net PnL: +$19.67** (return +1.97%) — passes the dev gate (net PnL > $0)
 - Trades: 4 (2 round trips), max drawdown: 0.80%, fees: $1.62
-- result_sha256: `dcfa42d363b5ca95f44432d165ab83a481e69a770a4e00e063da166c3f980917`
+- result_sha256: `82dea24dd0618bcee49ac8b201f31511ae817df4746c2d18f918a273b1fc1f2f`
 
 An EMA-filtered variant (enter only on a close crossing above EMA(20) with
 EMA(20) > EMA(50) and RSI(14) in 45–70, exit on cross below / RSI > 75 /
